@@ -64,11 +64,16 @@ void EditorHelpSearch::_update_results() {
 
 	String term = search_box->get_text();
 
-	int search_flags = filter_combo->get_selected_id();
-	if (case_sensitive_button->is_pressed())
+	if (case_sensitive_button->is_pressed()) {
 		search_flags |= SEARCH_CASE_SENSITIVE;
-	if (hierarchy_button->is_pressed())
+	} else {
+		search_flags &= ~SEARCH_CASE_SENSITIVE;
+	}
+	if (hierarchy_button->is_pressed()) {
 		search_flags |= SEARCH_SHOW_HIERARCHY;
+	} else {
+		search_flags &= ~SEARCH_SHOW_HIERARCHY;
+	}
 
 	search = Ref<Runner>(memnew(Runner(this, results_tree, term, search_flags)));
 	set_process(true);
@@ -96,7 +101,29 @@ void EditorHelpSearch::_search_box_text_changed(const String &p_text) {
 	_update_results();
 }
 
-void EditorHelpSearch::_filter_combo_item_selected(int p_option) {
+void EditorHelpSearch::_filter_menu_item_selected(int p_id) {
+
+	int index = filter_menu->get_item_index(p_id);
+
+	bool is_checked = !filter_menu->is_item_checked(index);
+	filter_menu->set_item_checked(index, is_checked);
+
+	if (is_checked) {
+		search_flags |= p_id;
+	} else {
+		search_flags &= ~p_id;
+	}
+
+	if (p_id == SEARCH_ALL) {
+		for (int i = 0; i < filter_menu->get_item_count(); ++i) {
+			if (filter_menu->is_item_checkable(i)) {
+				filter_menu->set_item_checked(i, is_checked);
+			}
+		}
+	} else  {
+		//check "All" only if all others are checked
+		filter_menu->set_item_checked(filter_menu->get_item_index(SEARCH_ALL), (search_flags & SEARCH_ALL) == SEARCH_ALL);
+	}
 
 	_update_results();
 }
@@ -164,7 +191,7 @@ void EditorHelpSearch::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("_update_results"), &EditorHelpSearch::_update_results);
 	ClassDB::bind_method(D_METHOD("_search_box_gui_input"), &EditorHelpSearch::_search_box_gui_input);
 	ClassDB::bind_method(D_METHOD("_search_box_text_changed"), &EditorHelpSearch::_search_box_text_changed);
-	ClassDB::bind_method(D_METHOD("_filter_combo_item_selected"), &EditorHelpSearch::_filter_combo_item_selected);
+	ClassDB::bind_method(D_METHOD("_filter_menu_item_selected"), &EditorHelpSearch::_filter_menu_item_selected);
 	ClassDB::bind_method(D_METHOD("_confirmed"), &EditorHelpSearch::_confirmed);
 	ADD_SIGNAL(MethodInfo("go_to_help"));
 }
@@ -195,6 +222,7 @@ void EditorHelpSearch::popup_dialog(const String &p_term) {
 
 EditorHelpSearch::EditorHelpSearch() {
 
+	search_flags = SEARCH_ALL | SEARCH_SHOW_HIERARCHY;
 	old_search = false;
 
 	set_hide_on_ok(false);
@@ -235,19 +263,25 @@ EditorHelpSearch::EditorHelpSearch() {
 	hierarchy_button->set_focus_mode(FOCUS_NONE);
 	hbox->add_child(hierarchy_button);
 
-	filter_combo = memnew(OptionButton);
-	filter_combo->set_custom_minimum_size(Size2(200, 0));
-	filter_combo->set_stretch_ratio(0); // Fixed width.
-	filter_combo->add_item(TTR("Display All"), SEARCH_ALL);
-	filter_combo->add_separator();
-	filter_combo->add_item(TTR("Classes Only"), SEARCH_CLASSES);
-	filter_combo->add_item(TTR("Methods Only"), SEARCH_METHODS);
-	filter_combo->add_item(TTR("Signals Only"), SEARCH_SIGNALS);
-	filter_combo->add_item(TTR("Constants Only"), SEARCH_CONSTANTS);
-	filter_combo->add_item(TTR("Properties Only"), SEARCH_PROPERTIES);
-	filter_combo->add_item(TTR("Theme Properties Only"), SEARCH_THEME_ITEMS);
-	filter_combo->connect("item_selected", this, "_filter_combo_item_selected");
-	hbox->add_child(filter_combo);
+	filter_menu_button = memnew(MenuButton);
+	filter_menu_button->set_text("Filter...");
+	filter_menu = filter_menu_button->get_popup();
+	filter_menu->set_hide_on_checkable_item_selection(false);
+	filter_menu->add_check_item("All", SEARCH_ALL);
+	filter_menu->add_separator();
+	filter_menu->add_check_item(TTR("Classes"), SEARCH_CLASSES);
+	filter_menu->add_check_item(TTR("Methods"), SEARCH_METHODS);
+	filter_menu->add_check_item(TTR("Signals"), SEARCH_SIGNALS);
+	filter_menu->add_check_item(TTR("Constants"), SEARCH_CONSTANTS);
+	filter_menu->add_check_item(TTR("Properties"), SEARCH_PROPERTIES);
+	filter_menu->add_check_item(TTR("Theme Properties"), SEARCH_THEME_ITEMS);
+	for (int i = 0; i < filter_menu->get_item_count(); ++i) {
+		if (filter_menu->is_item_checkable(i)) {
+			filter_menu->set_item_checked(i, true);
+		}
+	}
+	filter_menu->connect("id_pressed", this, "_filter_menu_item_selected");
+	hbox->add_child(filter_menu_button);
 
 	// Create the results tree.
 	results_tree = memnew(Tree);

@@ -56,7 +56,9 @@ class EditorHelpSearch : public ConfirmationDialog {
 	LineEdit *search_box;
 	ToolButton *case_sensitive_button;
 	ToolButton *hierarchy_button;
-	OptionButton *filter_combo;
+	MenuButton *filter_menu_button;
+	PopupMenu *filter_menu;
+	int search_flags;
 	Tree *results_tree;
 	bool old_search;
 
@@ -69,7 +71,7 @@ class EditorHelpSearch : public ConfirmationDialog {
 
 	void _search_box_gui_input(const Ref<InputEvent> &p_event);
 	void _search_box_text_changed(const String &p_text);
-	void _filter_combo_item_selected(int p_option);
+	void _filter_menu_item_selected(int p_id);
 	void _confirmed();
 
 protected:
